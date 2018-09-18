@@ -27,6 +27,13 @@ func NewRootDevicePartitioner(logger boshlog.Logger, cmdRunner boshsys.CmdRunner
 }
 
 func (p rootDevicePartitioner) Partition(devicePath string, partitions []Partition) error {
+        _, _, _, err := p.cmdRunner.RunCommand("sgdisk", "-e", devicePath)
+	if err != nil {
+                p.logger.Error(p.logTag, "Failed to move GPT backup to end of disk `%s'", devicePath)
+		return bosherr.WrapErrorf(err, "Moving GPT table to end of `%s'", devicePath)
+        }
+
+
 	existingPartitions, deviceFullSizeInBytes, err := p.getPartitions(devicePath)
 	if err != nil {
 		return bosherr.WrapErrorf(err, "Getting existing partitions of `%s'", devicePath)
@@ -59,9 +66,9 @@ func (p rootDevicePartitioner) Partition(devicePath string, partitions []Partiti
 
 	for index, partition := range partitions {
 		partitionEnd := partitionStart + partition.SizeInBytes - 1
-		if partitionEnd >= deviceFullSizeInBytes {
-			partitionEnd = deviceFullSizeInBytes - 1
-			p.logger.Info(p.logTag, "Partition %d would be larger than remaining space. Reducing size to %dB", index, partitionEnd-partitionStart)
+		if partitionEnd >= deviceFullSizeInBytes - 100*1024 {
+			partitionEnd = deviceFullSizeInBytes - 1 - 100*1024
+			p.logger.Info(p.logTag, "Partition %d would be larger than remaining space or overwrite GPT backup. Reducing size to %dB", index, partitionEnd-partitionStart)
 		}
 
 		p.logger.Info(p.logTag, "Creating partition %d with start %dB and end %dB", index, partitionStart, partitionEnd)
@@ -146,7 +153,7 @@ func (p rootDevicePartitioner) getPartitions(devicePath string) (
 
 	for _, partitionLine := range partitionLines {
 		// ignore PReP partition on ppc64le and EFI boot partition
-		if (strings.Contains(partitionLine, "prep") || string.Contains(partitionLine, "esp")) {
+		if (strings.Contains(partitionLine, "prep") || strings.Contains(partitionLine, "esp")) {
 			continue
 		}
 		partitionInfo := strings.Split(partitionLine, ":")
