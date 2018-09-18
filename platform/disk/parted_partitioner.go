@@ -131,8 +131,8 @@ func (p partedPartitioner) getPartitions(devicePath string) (partitions []existi
 	partitionLines := allLines[2 : len(allLines)-1]
 
 	for _, partitionLine := range partitionLines {
-		// ignore PReP partition on ppc64le
-		if strings.Contains(partitionLine, "prep") {
+		// ignore PReP partition on ppc64le and EFI boot partition
+		if (strings.Contains(partitionLine, "prep") || strings.Contains(partitionLine, "prep")){
 			continue
 		}
 		partitionInfo := strings.Split(partitionLine, ":")
